@@ -1,6 +1,7 @@
 # KRACK-Attack
 Attempt at demonstrating "Key Reinstallation Attacks: Forcing Nonce Reuse in WPA2"
-NOTE: This is currently in progress, and is expected to be completed October 20th, 2017
+
+## NOTE: This is currently in progress, and is expected to be completed October 20th, 2017
 
 
 ## Compiling
