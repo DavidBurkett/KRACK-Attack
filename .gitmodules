@@ -1,3 +1,0 @@
-[submodule "deps/libtins"]
-	path = deps/libtins
-	url = https://github.com/mfontanini/libtins
