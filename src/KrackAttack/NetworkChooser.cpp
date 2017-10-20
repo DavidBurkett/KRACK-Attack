@@ -71,6 +71,8 @@ bool NetworkChooser::GetNetworkList(vector<Network>& networks, const Device& dev
 
 	PWLAN_AVAILABLE_NETWORK_LIST pBssList = NULL;
 	PWLAN_AVAILABLE_NETWORK pBssEntry = NULL;
+	PWLAN_BSS_LIST pWlanBssList = NULL;
+
 	dwResult = WlanGetAvailableNetworkList(hClient, &device.guid, 0, NULL, &pBssList);
 
 	if (dwResult != ERROR_SUCCESS)
@@ -82,7 +84,22 @@ bool NetworkChooser::GetNetworkList(vector<Network>& networks, const Device& dev
 	for (unsigned int j = 0; j < pBssList->dwNumberOfItems; j++) {
 		pBssEntry = (WLAN_AVAILABLE_NETWORK *)& pBssList->Network[j];
 
-		networks.push_back(UnpackNetwork(pBssEntry));
+		Network network = UnpackNetwork(pBssEntry);
+
+		WlanGetNetworkBssList(hClient, &device.guid, &pBssEntry->dot11Ssid, pBssEntry->dot11BssType, pBssEntry->bSecurityEnabled, NULL, &pWlanBssList);
+		WLAN_BSS_ENTRY bssEntry = pWlanBssList->wlanBssEntries[0];
+		DOT11_MAC_ADDRESS& macAddress = bssEntry.dot11Bssid;
+
+		for (int k = 0; k < sizeof(bssEntry.dot11Bssid); k++) {
+			network.macAddress.push_back(bssEntry.dot11Bssid[k]);
+		}
+
+		if (pWlanBssList != NULL) {
+			WlanFreeMemory(pWlanBssList);
+			pWlanBssList = NULL;
+		}
+
+		networks.push_back(network);		
 	}
 
 	if (pBssList != NULL) {

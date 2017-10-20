@@ -20,9 +20,8 @@ void main(int argc, char **argv)
 			if (deviceHandle != INVALID_HANDLE_VALUE)
 			{
 				// TODO: The attack will take place here
+				//CloseHandle(deviceHandle);
 			}
-
-			CloseHandle(deviceHandle);
 		}
 	}
 }

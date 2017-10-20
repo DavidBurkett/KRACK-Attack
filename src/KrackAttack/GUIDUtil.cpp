@@ -14,7 +14,7 @@ string GUIDUtil::GetStringFromGuid(const GUID& guid)
 
 	if (iRet != 0)
 	{
-		wstring wGUID(&GuidString[0], &GuidString[0] + sizeof(GuidString));
+		wstring wGUID(&GuidString[0], &GuidString[0] + (sizeof(GuidString) / sizeof(WCHAR)) - 1);
 		return string(wGUID.cbegin(), wGUID.cend());
 	}
 

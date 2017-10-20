@@ -3,96 +3,110 @@
 #include "GUIDUtil.h"
 #include "80211hdr.h"
 
-#include <stdio.h>
-#include <stdlib.h>  //for system()
-#include <winsock2.h> //for 80211
-#include <ntddndis.h>
-
-#define MAC_ADDR_LEN  6
-CHAR            PacketuioDevice[] = "\\\\.\\Packet11";
-CHAR *          pPacketuioDevice = &PacketuioDevice[0];
-
-#define _NDIS_CONTROL_CODE(request,method) \
-            CTL_CODE(FILE_DEVICE_PHYSICAL_NETCARD, request, method, FILE_ANY_ACCESS)
-
-//codes 5, 6, 19 will be supported in a later version
-#define IOCTL_PACKET11_SET_OID_VALUE          _NDIS_CONTROL_CODE(5, METHOD_BUFFERED)
-#define IOCTL_PACKET11_QUERY_OID_VALUE        _NDIS_CONTROL_CODE(6, METHOD_BUFFERED)
-#define IOCTL_PACKET11_INSERT_PACKET		_NDIS_CONTROL_CODE(14, METHOD_BUFFERED)
-#define IOCTL_PACKET11_GET_BSSID			_NDIS_CONTROL_CODE(19, METHOD_BUFFERED)
-#define IOCTL_PACKET11_GET_MAC				_NDIS_CONTROL_CODE(20, METHOD_BUFFERED)
-
-BOOL IORequest(HANDLE Handle,
-	DWORD controlcode,
-	PUCHAR input,
-	DWORD inputsize,
-	PUCHAR output,
-	DWORD outputsize
-)
-{
-
-	DWORD   BytesReturned = 0;
-	BOOL status;
-
-	status = (DeviceIoControl(
-		Handle,
-		controlcode,
-		input,
-		inputsize,
-		output,
-		outputsize,
-		&BytesReturned,
-		NULL));
-
-	if (GetLastError() != 0)
-		printf("error %d , bytes returned %d \n", GetLastError(), BytesReturned);
-
-	//Packet11 returns ERROR_NETWORK_ACCESS_DENIED if the user packet could not be allocated
-	if (GetLastError() == ERROR_NETWORK_ACCESS_DENIED) printf("Waiting for network resources \n");
-
-	return status;
-
-}
+#include <pcap.h>
 
 HANDLE ConnectionFactory::OpenConnection(const Device& device, const Network& network) const
 {
+	pcap_t* fp;
+	char errbuf[PCAP_ERRBUF_SIZE];
+
 	std::string guid = GUIDUtil::GetStringFromGuid(device.guid);
-	std::string deviceName = "\\\\.\\" + guid;
-
-	std::string deviceNamePacket11 = deviceName + "\\packet11";
-
-	DWORD   DesiredAccess;
-	DWORD   ShareMode;
-	LPSECURITY_ATTRIBUTES   lpSecurityAttributes = NULL;
-
-	DWORD   CreationDistribution;
-	DWORD   FlagsAndAttributes;
-	HANDLE  Handle;
-
-
-	DesiredAccess = GENERIC_READ | GENERIC_WRITE;
-	ShareMode = 0;
-	CreationDistribution = OPEN_EXISTING;
-	FlagsAndAttributes = FILE_ATTRIBUTE_NORMAL;
-
-	Handle = CreateFile(
-		deviceNamePacket11.c_str()/*deviceName.c_str()*/,
-		DesiredAccess,
-		ShareMode,
-		lpSecurityAttributes,
-		CreationDistribution,
-		FlagsAndAttributes,
-		NULL
-	);
-
-	if (Handle == INVALID_HANDLE_VALUE)
+	std::string deviceName = "rpcap://\\Device\\NPF_" + guid;
+	/* Open the output device */
+	if ((fp = pcap_open(deviceName.c_str(),            // name of the device
+		100,                // portion of the packet to capture (only the first 100 bytes)
+		PCAP_OPENFLAG_PROMISCUOUS,  // promiscuous mode
+		1000,               // read timeout
+		NULL,               // authentication on the remote machine
+		errbuf              // error buffer
+	)) == NULL)
 	{
-		printf("Creating file failed, error %x\n", GetLastError());
-		return Handle;
+		fprintf(stderr, "\nUnable to open the adapter. %s is not supported by WinPcap\n", guid);
+		return NULL;
 	}
 
-	UCHAR						Source[MAC_ADDR_LEN];
-	IORequest(Handle, IOCTL_PACKET11_GET_MAC, NULL, 0, Source, MAC_ADDR_LEN);
+	DOT11_MGMT_HEADER mgmtHeader;
+	mgmtHeader.FrameControl.Version = 0;
+	mgmtHeader.FrameControl.Type = DOT11_FRAME_TYPE_MANAGEMENT;
+	mgmtHeader.FrameControl.Subtype = DOT11_MGMT_SUBTYPE_AUTHENTICATION;
+	mgmtHeader.FrameControl.ToDS = 0;
+	mgmtHeader.FrameControl.FromDS = 0;
+	mgmtHeader.FrameControl.MoreFrag = 0;
+	mgmtHeader.FrameControl.Retry = 0;
+	mgmtHeader.FrameControl.PwrMgt = 0;
+	mgmtHeader.FrameControl.MoreData = 0;
+	mgmtHeader.FrameControl.WEP = 0;
+	mgmtHeader.FrameControl.Order = 0;
 
-	return Handle;
+	mgmtHeader.DurationID = 0x0060;
+
+	memcpy(&mgmtHeader.DA[0], &network.macAddress[0], 6 * sizeof(uint8_t));
+	memcpy(&mgmtHeader.SA[0], &device.macAddress[0], 6 * sizeof(uint8_t));
+	memcpy(&mgmtHeader.BSSID[0], &network.macAddress[0], 6 * sizeof(uint8_t));
+	mgmtHeader.SequenceControl.FragmentNumber = 0x00;
+	mgmtHeader.SequenceControl.SequenceNumber = 0x00;
+
+
+	DOT11_AUTH_FRAME authFrame;
+	authFrame.usAlgorithmNumber = DOT11_AUTH_OPEN_SYSTEM;
+	authFrame.usXid = 0x01;
+	authFrame.usStatusCode = 0x00;
+
+	std::vector<unsigned char> packet;
+	packet.insert(packet.begin(), (unsigned char*)&mgmtHeader, (unsigned char*)&mgmtHeader + sizeof(DOT11_MGMT_HEADER));
+	packet.insert(packet.end(), (unsigned char*)&authFrame, (unsigned char*)&authFrame + sizeof(DOT11_AUTH_FRAME));
+
+	//while (packet.size() <= 40)
+	//{
+	//	packet.push_back(0);
+	//}
+
+	//u_char packet[100];
+	//packet[0] = 0xb0;
+	//packet[1] = 0x00;
+	//packet[2] = 0x00;
+	//packet[3] = 0x00;
+
+	//// Router MAC Address
+	//packet[4] = network.macAddress[0];
+	//packet[5] = network.macAddress[1];
+	//packet[6] = network.macAddress[2];
+	//packet[7] = network.macAddress[3];
+	//packet[8] = network.macAddress[4];
+	//packet[9] = network.macAddress[5];
+
+	//// NIC MAC Address
+	//packet[10] = device.macAddress[0];
+	//packet[11] = device.macAddress[1];
+	//packet[12] = device.macAddress[2];
+	//packet[13] = device.macAddress[3];
+	//packet[14] = device.macAddress[4];
+	//packet[15] = device.macAddress[5];
+
+	///* Fill the rest of the packet */
+	//for (int i = 12; i < 100; i++)
+	//{
+	//	packet[i] = i % 256;
+	//}
+
+
+
+	//char pcap_errbuf[PCAP_ERRBUF_SIZE];
+	//pcap_errbuf[0] = '\0';
+	//fp = pcap_open_live(deviceName.c_str(), 96, 0, 0, pcap_errbuf);
+
+	//pcap_inject(fp, packet, 100);
+
+	//pcap_set_datalink(fp, DLT_IEEE802_11_RADIO);
+
+	/* Send down the packet */
+	if (pcap_sendpacket(fp, &packet[0], packet.size() /* size */) != 0)
+	{
+		fprintf(stderr, "\nError sending the packet: \n", pcap_geterr(fp));
+		return NULL;
+	}
+
+	pcap_close(fp);
+
+	return fp;
 }

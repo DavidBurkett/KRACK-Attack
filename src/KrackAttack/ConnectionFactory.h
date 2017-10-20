@@ -9,4 +9,7 @@ class ConnectionFactory
 {
 public:
 	HANDLE OpenConnection(const Device& device, const Network& network) const;
+
+private:
+	unsigned char* GetPacket() const;
 };

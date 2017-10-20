@@ -1,1 +1,12 @@
 .vs/
+x64/
+win32/
+deps/
+
+*.obj
+*.idb
+*.lib
+*.exe
+*.tlog
+*.pdb
+*.ilk
