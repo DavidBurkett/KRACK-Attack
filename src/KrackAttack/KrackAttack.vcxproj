@@ -138,6 +138,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AssociationManager.cpp" />
     <ClCompile Include="ConnectionFactory.cpp" />
     <ClCompile Include="DeviceChooser.cpp" />
     <ClCompile Include="GUIDUtil.cpp" />
@@ -147,10 +148,13 @@
   <ItemGroup>
     <ClInclude Include="80211hdr.h" />
     <ClInclude Include="AuthenticationMode.h" />
+    <ClInclude Include="AssociationManager.h" />
     <ClInclude Include="CipherMode.h" />
     <ClInclude Include="ConnectionFactory.h" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="DeviceChooser.h" />
+    <ClInclude Include="Ether.h" />
+    <ClInclude Include="Ethertype.h" />
     <ClInclude Include="GUIDUtil.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="NetworkChooser.h" />

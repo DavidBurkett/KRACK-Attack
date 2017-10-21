@@ -1,15 +1,15 @@
 #pragma once
 
-#include <winsock2.h>
+#include <WinSock2.h>
 
 #include "Device.h"
 #include "Network.h"
 
+// Forward Declarations
+struct pcap;
+
 class ConnectionFactory
 {
 public:
-	HANDLE OpenConnection(const Device& device, const Network& network) const;
-
-private:
-	unsigned char* GetPacket() const;
+	pcap* OpenConnection(const Device& device, const Network& network) const;
 };

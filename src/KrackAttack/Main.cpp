@@ -2,25 +2,40 @@
 #include "NetworkChooser.h"
 #include "ConnectionFactory.h"
 #include "80211hdr.h"
+#include "AssociationManager.h"
 
-#include <iostream>
+#include <pcap.h>
 
 void main(int argc, char **argv)
 {
-	// Get Device
+	//
+	// Choose a network interface.
+	//
 	Device device;
 	if (DeviceChooser().ChooseDevice(device))
 	{
 		printf("\n");
+
+		//
+		// Choose a wireless network.
+		//
 		Network network;
 		if (NetworkChooser().ChooseNetwork(network, device))
 		{
 			printf("Checking if vulnerable....");
-			HANDLE deviceHandle = ConnectionFactory().OpenConnection(device, network);
-			if (deviceHandle != INVALID_HANDLE_VALUE)
+
+			//
+			// Establish connection with the wireless network.
+			//
+			pcap* connection = ConnectionFactory().OpenConnection(device, network);
+			if (connection != nullptr)
 			{
-				// TODO: The attack will take place here
-				//CloseHandle(deviceHandle);
+				if (AssociationManager().AssociateWithNetwork(connection, device, network))
+				{
+					// TODO: The attack will take place here
+				}
+
+				pcap_close(connection);
 			}
 		}
 	}
